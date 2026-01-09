@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -347,7 +348,6 @@ func (i *ListInputProvider) initializeInputSources(opts *Options) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -548,9 +548,55 @@ func (i *ListInputProvider) addTargets(executionId string, targets []string) {
 }
 
 func (i *ListInputProvider) removeTargets(targets []string) {
-	for _, target := range targets {
-		metaInput := contextargs.NewMetaInput()
-		metaInput.Input = target
-		i.delItem(metaInput)
+	ips := make(map[string]struct{})
+	var cidrs []*net.IPNet
+
+	for _, t := range targets {
+		_, ipnet, err := net.ParseCIDR(t)
+		if err == nil {
+			cidrs = append(cidrs, ipnet)
+		} else {
+			ips[t] = struct{}{}
+		}
+	}
+
+	var keysToDelete [][]byte
+
+	i.hostMap.Scan(func(k, v []byte) error {
+		rawURL := string(k)
+
+		if _, ok := ips[rawURL]; ok {
+			keysToDelete = append(keysToDelete, k)
+			return nil
+		}
+
+		parsed, err := urlutil.ParseURL(rawURL, true)
+		if err != nil {
+			return nil
+		}
+
+		hostname := parsed.Hostname()
+
+		if _, ok := ips[hostname]; ok {
+			keysToDelete = append(keysToDelete, k)
+			return nil
+		}
+
+		if len(cidrs) > 0 {
+			if ip := net.ParseIP(hostname); ip != nil {
+				for _, ipnet := range cidrs {
+					if ipnet.Contains(ip) {
+						keysToDelete = append(keysToDelete, k)
+						return nil
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+
+	for _, key := range keysToDelete {
+		i.hostMap.Del(string(key))
 	}
 }
