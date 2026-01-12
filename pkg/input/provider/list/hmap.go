@@ -606,7 +606,7 @@ func (i *ListInputProvider) removeTargets(targets []string) {
 				}
 			}
 
-			if metaInput.CustomIP != "" && len(cidrs) > 0 {
+			if metaInput.CustomIP != "" {
 				if ip := net.ParseIP(metaInput.CustomIP); ip != nil {
 					for _, ipnet := range cidrs {
 						if ipnet.Contains(ip) {
