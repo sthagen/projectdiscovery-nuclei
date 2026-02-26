@@ -88,7 +88,7 @@ func (p *Page) routingRuleHandler(httpClient *http.Client) func(ctx *rod.Hijack)
 		var rawResp strings.Builder
 		respPayloads := ctx.Response.Payload()
 		if respPayloads != nil {
-			fmt.Fprintf(&rawResp, "HTTP/1.1 %d %s\n", respPayloads.ResponseCode, respPayloads.ResponsePhrase)
+			rawResp.WriteString(fmt.Sprintf("HTTP/1.1 %d %s\n", respPayloads.ResponseCode, respPayloads.ResponsePhrase))
 			for _, header := range respPayloads.ResponseHeaders {
 				rawResp.WriteString(header.Name + ": " + header.Value + "\n")
 			}
@@ -126,17 +126,17 @@ func (p *Page) routingRuleHandlerNative(e *proto.FetchRequestPaused) error {
 
 	// attempts to rebuild request
 	var rawReq strings.Builder
-	fmt.Fprintf(&rawReq, "%s %s %s\n", e.Request.Method, e.Request.URL, "HTTP/1.1")
+	rawReq.WriteString(fmt.Sprintf("%s %s %s\n", e.Request.Method, e.Request.URL, "HTTP/1.1"))
 	for _, header := range e.Request.Headers {
-		fmt.Fprintf(&rawReq, "%s\n", header.String())
+		rawReq.WriteString(fmt.Sprintf("%s\n", header.String()))
 	}
 	if e.Request.HasPostData {
-		fmt.Fprintf(&rawReq, "\n%s\n", e.Request.PostData)
+		rawReq.WriteString(fmt.Sprintf("\n%s\n", e.Request.PostData))
 	}
 
 	// attempts to rebuild the response
 	var rawResp strings.Builder
-	fmt.Fprintf(&rawResp, "HTTP/1.1 %d %s\n", statusCode, e.ResponseStatusText)
+	rawResp.WriteString(fmt.Sprintf("HTTP/1.1 %d %s\n", statusCode, e.ResponseStatusText))
 	for _, header := range e.ResponseHeaders {
 		rawResp.WriteString(header.Name + ": " + header.Value + "\n")
 	}

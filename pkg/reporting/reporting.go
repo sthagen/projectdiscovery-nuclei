@@ -262,10 +262,10 @@ func (c *ReportingClient) Close() {
 					continue
 				}
 				var msgBuilder strings.Builder
-				fmt.Fprintf(&msgBuilder, "%d %s tickets created successfully", created, trackerName)
+				msgBuilder.WriteString(fmt.Sprintf("%d %s tickets created successfully", created, trackerName))
 				failed := stats.Failed.Load()
 				if failed > 0 {
-					fmt.Fprintf(&msgBuilder, ", %d failed", failed)
+					msgBuilder.WriteString(fmt.Sprintf(", %d failed", failed))
 				}
 				gologger.Info().Msgf("%v", msgBuilder.String())
 			}
