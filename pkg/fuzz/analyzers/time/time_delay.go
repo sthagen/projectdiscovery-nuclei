@@ -98,13 +98,11 @@ func checkTimingDependency(
 	result := regression.IsWithinConfidence(correlationErrorRange, 1.0, slopeErrorRange)
 	if result {
 		var resultReason strings.Builder
-		fmt.Fprintf(&resultReason,
-			"[time_delay] made %d requests (baseline: %.2fs) successfully, with a regression slope of %.2f and correlation %.2f",
+		fmt.Fprintf(&resultReason, "[time_delay] made %d requests (baseline: %.2fs) successfully, with a regression slope of %.2f and correlation %.2f",
 			requestsLimit,
 			baselineDelay,
 			regression.slope,
-			regression.correlation,
-		)
+			regression.correlation)
 		for _, request := range requestsSent {
 			fmt.Fprintf(&resultReason, "\n - delay: %ds, delayReceived: %fs", request.delay, request.delayReceived)
 		}
