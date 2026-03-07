@@ -68,9 +68,7 @@ func (e *Engine) executeTemplateWithTargets(ctx context.Context, template *templ
 		currentInfo = &generalTypes.ResumeInfo{}
 		e.executerOpts.ResumeCfg.Current[template.ID] = currentInfo
 	}
-	if currentInfo.InFlight == nil {
-		currentInfo.InFlight = make(map[uint32]struct{})
-	}
+	currentInfo.InitInFlight()
 	resumeFromInfo, ok := e.executerOpts.ResumeCfg.ResumeFrom[template.ID]
 	if !ok {
 		resumeFromInfo = &generalTypes.ResumeInfo{}

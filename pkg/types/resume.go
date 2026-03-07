@@ -53,6 +53,14 @@ func (resumeInfo *ResumeInfo) GetDoAbove() uint32 {
 	return resumeInfo.DoAbove
 }
 
+func (resumeInfo *ResumeInfo) InitInFlight() {
+	resumeInfo.Lock()
+	defer resumeInfo.Unlock()
+	if resumeInfo.InFlight == nil {
+		resumeInfo.InFlight = make(map[uint32]struct{})
+	}
+}
+
 func (resumeInfo *ResumeInfo) IsInFlight(index uint32) bool {
 	resumeInfo.RLock()
 	defer resumeInfo.RUnlock()
