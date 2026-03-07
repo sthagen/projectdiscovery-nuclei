@@ -14,8 +14,8 @@ import (
 const DefaultResumeFileName = "resume-%s.cfg"
 
 func DefaultResumeFilePath() string {
-	configDir := config.DefaultConfig.GetCacheDir()
-	resumeFile := filepath.Join(configDir, fmt.Sprintf(DefaultResumeFileName, xid.New().String()))
+	cacheDir := config.DefaultConfig.GetCacheDir()
+	resumeFile := filepath.Join(cacheDir, fmt.Sprintf(DefaultResumeFileName, xid.New().String()))
 	return resumeFile
 }
 
