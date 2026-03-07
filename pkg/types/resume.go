@@ -35,16 +35,29 @@ type ResumeInfo struct {
 	DoAbove   uint32              `json:"-"`
 }
 
-// Snapshot returns the current state of the ResumeInfo instance
-func (resumeInfo *ResumeInfo) Snapshot(index uint32) (completed bool, skipUnder uint32, doAbove uint32, isInFlight bool) {
- 	resumeInfo.RLock()
+func (resumeInfo *ResumeInfo) IsCompleted() bool {
 	resumeInfo.RLock()
 	defer resumeInfo.RUnlock()
-	completed = resumeInfo.Completed
-	skipUnder = resumeInfo.SkipUnder
-	doAbove = resumeInfo.DoAbove
-	_, isInFlight = resumeInfo.InFlight[index]
-	return
+	return resumeInfo.Completed
+}
+
+func (resumeInfo *ResumeInfo) GetSkipUnder() uint32 {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	return resumeInfo.SkipUnder
+}
+
+func (resumeInfo *ResumeInfo) GetDoAbove() uint32 {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	return resumeInfo.DoAbove
+}
+
+func (resumeInfo *ResumeInfo) IsInFlight(index uint32) bool {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	_, ok := resumeInfo.InFlight[index]
+	return ok
 }
 
 // Clone the ResumeInfo structure
