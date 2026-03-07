@@ -35,6 +35,39 @@ type ResumeInfo struct {
 	DoAbove   uint32              `json:"-"`
 }
 
+func (resumeInfo *ResumeInfo) IsCompleted() bool {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	return resumeInfo.Completed
+}
+
+func (resumeInfo *ResumeInfo) GetSkipUnder() uint32 {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	return resumeInfo.SkipUnder
+}
+
+func (resumeInfo *ResumeInfo) GetDoAbove() uint32 {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	return resumeInfo.DoAbove
+}
+
+func (resumeInfo *ResumeInfo) InitInFlight() {
+	resumeInfo.Lock()
+	defer resumeInfo.Unlock()
+	if resumeInfo.InFlight == nil {
+		resumeInfo.InFlight = make(map[uint32]struct{})
+	}
+}
+
+func (resumeInfo *ResumeInfo) IsInFlight(index uint32) bool {
+	resumeInfo.RLock()
+	defer resumeInfo.RUnlock()
+	_, ok := resumeInfo.InFlight[index]
+	return ok
+}
+
 // Clone the ResumeInfo structure
 func (resumeInfo *ResumeInfo) Clone() *ResumeInfo {
 	resumeInfo.Lock()
