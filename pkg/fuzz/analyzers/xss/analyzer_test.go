@@ -102,6 +102,18 @@ func TestAnalyzeReflectionContext(t *testing.T) {
 			marker:   marker,
 			expected: ContextHTMLAttributeEvent,
 		},
+		{
+			name:     "reflection in onauxclick handler",
+			body:     `<div onauxclick="handle('FUZZ1337MARKER')">right-click</div>`,
+			marker:   marker,
+			expected: ContextHTMLAttributeEvent,
+		},
+		{
+			name:     "reflection in onbeforeinput handler",
+			body:     `<input onbeforeinput="check('FUZZ1337MARKER')">`,
+			marker:   marker,
+			expected: ContextHTMLAttributeEvent,
+		},
 
 		// === Script Context (executable) ===
 		{
@@ -125,6 +137,12 @@ func TestAnalyzeReflectionContext(t *testing.T) {
 		{
 			name:     "reflection in script type=application/javascript",
 			body:     `<script type="application/javascript">var y = "FUZZ1337MARKER";</script>`,
+			marker:   marker,
+			expected: ContextScript,
+		},
+		{
+			name:     "script type with MIME parameters still executable",
+			body:     `<script type="text/javascript; charset=utf-8">var x = "FUZZ1337MARKER";</script>`,
 			marker:   marker,
 			expected: ContextScript,
 		},

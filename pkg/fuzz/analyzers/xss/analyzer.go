@@ -120,6 +120,12 @@ var eventHandlers = map[string]struct{}{
 	"ontouchend":           {},
 	"ontouchmove":          {},
 	"ontouchcancel":        {},
+	// added after review, these are newer DOM events that were missing
+	"onauxclick":           {},
+	"onbeforeinput":        {},
+	"onformdata":           {},
+	"onslotchange":         {},
+	"onsecuritypolicyviolation": {},
 }
 
 // Script MIME types that browsers actually execute.
@@ -267,7 +273,13 @@ func scanAttributes(tokenizer *html.Tokenizer, markerLower, tagName string) (XSS
 
 // isScriptTypeExecutable returns true if the type value is something
 // browsers will actually run (or empty, meaning no type was set).
+// Strips MIME parameters first, browsers still execute
+// "text/javascript; charset=utf-8" but the raw string wouldn't match
+// the lookup table without this.
 func isScriptTypeExecutable(scriptType string) bool {
+	if i := strings.IndexByte(scriptType, ';'); i != -1 {
+		scriptType = strings.TrimSpace(scriptType[:i])
+	}
 	_, isExec := executableScriptTypes[scriptType]
 	return isExec
 }
