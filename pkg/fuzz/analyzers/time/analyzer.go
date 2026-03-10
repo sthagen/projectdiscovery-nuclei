@@ -131,6 +131,10 @@ func (a *Analyzer) Analyze(options *analyzers.Options) (bool, string, error) {
 		// time-delay request carries the same headers — including cookies and
 		// auth tokens — as the request that triggered the initial delay.
 		for k, vs := range gr.Request.Header {
+			// Skip the header being fuzzed to avoid overwriting the time-delay payload
+			if gr.Component.Name() == "header" && k == gr.Key {
+				continue
+			}
 			rebuilt.Header[k] = vs
 		}
 
