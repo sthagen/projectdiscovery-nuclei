@@ -27,6 +27,8 @@ extend-exclude = [
 MisMatched = "MisMatched"
 NoopWriter = "NoopWriter"
 AllowdTypes = "AllowdTypes"
+# Deprecated alias kept for backward compatibility
+ExludedDastTmplStats = "ExludedDastTmplStats"
 
 [default.extend-words]
 # Variable name used for flow annotations
