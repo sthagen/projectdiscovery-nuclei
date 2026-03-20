@@ -186,4 +186,3 @@ func normalizeHostWithoutPort(host string) string {
 	}
 	return h
 }
-

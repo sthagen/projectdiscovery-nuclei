@@ -106,4 +106,3 @@ func TestHostNormalization(t *testing.T) {
 	require.True(t, d4.IsFlagged("[2001:db8::1]:443"))
 	require.False(t, d4.IsFlagged("2001:db8::1"), "IPv6 with explicit port must not share the same key as IPv6 without port")
 }
-

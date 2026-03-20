@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"maps"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,8 +29,8 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/model"
 	"github.com/projectdiscovery/nuclei/v3/pkg/model/types/severity"
 	"github.com/projectdiscovery/nuclei/v3/pkg/operators"
-	protocolUtils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/honeypotdetector"
+	protocolUtils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types/nucleierr"
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils"
@@ -275,23 +275,23 @@ func NewStandardWriter(options *types.Options) (*StandardWriter, error) {
 	}
 
 	writer := &StandardWriter{
-		json:             options.JSONL,
-		jsonReqResp:      !options.OmitRawRequests,
-		noMetadata:       options.NoMeta,
-		matcherStatus:    options.MatcherStatus,
-		timestamp:        options.Timestamp,
-		suppressHoneypot: options.SuppressHoneypotResults,
+		json:              options.JSONL,
+		jsonReqResp:       !options.OmitRawRequests,
+		noMetadata:        options.NoMeta,
+		matcherStatus:     options.MatcherStatus,
+		timestamp:         options.Timestamp,
+		suppressHoneypot:  options.SuppressHoneypotResults,
 		honeypotThreshold: options.HoneypotThreshold,
-		aurora:           auroraColorizer,
-		mutex:            &sync.Mutex{},
-		outputFile:       outputFile,
-		traceFile:        traceOutput,
-		errorFile:        errorOutput,
-		severityColors:   colorizer.New(auroraColorizer),
-		storeResponse:    options.StoreResponse,
-		storeResponseDir: options.StoreResponseDir,
-		omitTemplate:     options.OmitTemplate,
-		KeysToRedact:     options.Redact,
+		aurora:            auroraColorizer,
+		mutex:             &sync.Mutex{},
+		outputFile:        outputFile,
+		traceFile:         traceOutput,
+		errorFile:         errorOutput,
+		severityColors:    colorizer.New(auroraColorizer),
+		storeResponse:     options.StoreResponse,
+		storeResponseDir:  options.StoreResponseDir,
+		omitTemplate:      options.OmitTemplate,
+		KeysToRedact:      options.Redact,
 	}
 
 	if v := os.Getenv("DISABLE_STDOUT"); v == "true" || v == "1" {

@@ -595,7 +595,7 @@ func (options *Options) Copy() *Options {
 		StopAtFirstMatch:               options.StopAtFirstMatch,
 		HoneypotDetection:              options.HoneypotDetection,
 		HoneypotThreshold:              options.HoneypotThreshold,
-		SuppressHoneypotResults:       options.SuppressHoneypotResults,
+		SuppressHoneypotResults:        options.SuppressHoneypotResults,
 		Stream:                         options.Stream,
 		NoMeta:                         options.NoMeta,
 		Timestamp:                      options.Timestamp,
