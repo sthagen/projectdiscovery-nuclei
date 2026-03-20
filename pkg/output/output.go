@@ -2,9 +2,11 @@ package output
 
 import (
 	"encoding/base64"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"maps"
 	"os"
 	"path/filepath"
@@ -28,6 +30,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/model/types/severity"
 	"github.com/projectdiscovery/nuclei/v3/pkg/operators"
 	protocolUtils "github.com/projectdiscovery/nuclei/v3/pkg/protocols/utils"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/honeypotdetector"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types"
 	"github.com/projectdiscovery/nuclei/v3/pkg/types/nucleierr"
 	"github.com/projectdiscovery/nuclei/v3/pkg/utils"
@@ -37,6 +40,10 @@ import (
 	unitutils "github.com/projectdiscovery/utils/unit"
 	urlutil "github.com/projectdiscovery/utils/url"
 )
+
+// ErrHoneypotSuppressed is returned by the output writer when a match result is suppressed
+// due to honeypot detection.
+var ErrHoneypotSuppressed = stderrors.New("honeypot suppressed result")
 
 // Writer is an interface which writes output to somewhere for nuclei events.
 type Writer interface {
@@ -65,6 +72,9 @@ type StandardWriter struct {
 	timestamp             bool
 	noMetadata            bool
 	matcherStatus         bool
+	honeypotDetector      *honeypotdetector.Detector
+	suppressHoneypot      bool
+	honeypotThreshold     int
 	mutex                 *sync.Mutex
 	aurora                aurora.Aurora
 	outputFile            io.WriteCloser
@@ -270,6 +280,8 @@ func NewStandardWriter(options *types.Options) (*StandardWriter, error) {
 		noMetadata:       options.NoMeta,
 		matcherStatus:    options.MatcherStatus,
 		timestamp:        options.Timestamp,
+		suppressHoneypot: options.SuppressHoneypotResults,
+		honeypotThreshold: options.HoneypotThreshold,
 		aurora:           auroraColorizer,
 		mutex:            &sync.Mutex{},
 		outputFile:       outputFile,
@@ -289,6 +301,14 @@ func NewStandardWriter(options *types.Options) (*StandardWriter, error) {
 	return writer, nil
 }
 
+// SetHoneypotDetector attaches an initialized honeypot detector to the writer.
+func (w *StandardWriter) SetHoneypotDetector(detector *honeypotdetector.Detector) {
+	w.honeypotDetector = detector
+	if detector != nil {
+		w.honeypotThreshold = detector.Threshold()
+	}
+}
+
 func (w *StandardWriter) ResultCount() int {
 	return int(w.resultCount.Load())
 }
@@ -297,6 +317,29 @@ func (w *StandardWriter) ResultCount() int {
 func (w *StandardWriter) Write(event *ResultEvent) error {
 	if event.Error != "" && !w.matcherStatus {
 		return nil
+	}
+
+	// Honeypot detection is performed only for successful matches.
+	if event.MatcherStatus && w.honeypotDetector != nil {
+		hostKey := event.URL
+		if hostKey == "" && event.Host != "" {
+			hostKey = event.Host
+			if event.Port != "" {
+				hostKey = net.JoinHostPort(event.Host, event.Port)
+			}
+		}
+
+		if hostKey != "" {
+			justFlagged := w.honeypotDetector.RecordMatch(hostKey, event.TemplateID)
+			if justFlagged {
+				normalized := honeypotdetector.NormalizeHostKey(hostKey)
+				gologger.Warning().Msgf("Potential honeypot detected: %s (matched %d distinct templates)", normalized, w.honeypotThreshold)
+			}
+
+			if w.suppressHoneypot && w.honeypotDetector.IsFlagged(hostKey) {
+				return ErrHoneypotSuppressed
+			}
+		}
 	}
 
 	// Enrich the result event with extra metadata on the template-path and url.
