@@ -487,6 +487,12 @@ on extensive configurability, massive extensibility and ease of use.`)
 		flagSet.CallbackVarP(disableUpdatesCallback, "disable-update-check", "duc", "disable automatic nuclei/templates update check"),
 	)
 
+	flagSet.CreateGroup("Honeypot", "Honeypot",
+		flagSet.BoolVarP(&options.HoneypotDetection, "honeypot-detect", "hpd", false, "detect potential honeypot hosts based on match concentration"),
+		flagSet.IntVarP(&options.HoneypotThreshold, "honeypot-threshold", "hpt", 15, "number of distinct template IDs required to flag a honeypot host"),
+		flagSet.BoolVarP(&options.SuppressHoneypotResults, "suppress-honeypot", "shp", false, "suppress output for flagged honeypot hosts"),
+	)
+
 	flagSet.CreateGroup("stats", "Statistics",
 		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display statistics about the running scan"),
 		flagSet.BoolVarP(&options.StatsJSON, "stats-json", "sj", false, "display statistics in JSONL(ines) format"),

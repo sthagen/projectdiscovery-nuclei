@@ -54,6 +54,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/hosterrorscache"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/interactsh"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolinit"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/honeypotdetector"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/uncover"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/excludematchers"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
@@ -96,6 +97,8 @@ type Runner struct {
 	fuzzFrequencyCache *frequency.Tracker
 	httpStats          *outputstats.Tracker
 	Logger             *gologger.Logger
+
+	honeypotDetector *honeypotdetector.Detector
 
 	//general purpose temporary directory
 	tmpDir          string
@@ -261,6 +264,12 @@ func New(options *types.Options) (*Runner, error) {
 		}
 	}()
 
+	// Initialize honeypot detector (opt-in) so results can be suppressed.
+	var hpDetector *honeypotdetector.Detector
+	if options.HoneypotDetection {
+		hpDetector = honeypotdetector.New(options.HoneypotThreshold)
+	}
+
 	// create the input provider and load the inputs
 	inputProvider, err := provider.NewInputProvider(provider.InputOptions{Options: options, TempDir: runner.tmpDir})
 	if err != nil {
@@ -272,6 +281,10 @@ func New(options *types.Options) (*Runner, error) {
 	outputWriter, err := output.NewStandardWriter(options)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create output file")
+	}
+	if hpDetector != nil {
+		outputWriter.SetHoneypotDetector(hpDetector)
+		runner.honeypotDetector = hpDetector
 	}
 	// setup a proxy writer to automatically upload results to PDCP
 	runner.output = runner.setupPDCPUpload(outputWriter)
@@ -420,6 +433,10 @@ func (r *Runner) Close() {
 	}
 	if r.output != nil {
 		r.output.Close()
+	}
+
+	if r.honeypotDetector != nil {
+		r.Logger.Print().Msgf("%s\n", r.honeypotDetector.Summary())
 	}
 	if r.issuesClient != nil {
 		r.issuesClient.Close()

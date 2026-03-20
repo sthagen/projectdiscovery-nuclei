@@ -258,6 +258,13 @@ type Options struct {
 	Stdin bool
 	// StopAtFirstMatch stops processing template at first full match (this may break chained requests)
 	StopAtFirstMatch bool
+
+	// HoneypotDetection enables detection of potential honeypots based on match concentration.
+	HoneypotDetection bool
+	// HoneypotThreshold is the number of distinct template IDs required to flag a host as a potential honeypot.
+	HoneypotThreshold int
+	// SuppressHoneypotResults suppresses output writing for flagged honeypot hosts.
+	SuppressHoneypotResults bool
 	// Stream the input without sorting
 	Stream bool
 	// NoMeta disables display of metadata for the matches
@@ -588,6 +595,9 @@ func (options *Options) Copy() *Options {
 		HangMonitor:                    options.HangMonitor,
 		Stdin:                          options.Stdin,
 		StopAtFirstMatch:               options.StopAtFirstMatch,
+		HoneypotDetection:              options.HoneypotDetection,
+		HoneypotThreshold:              options.HoneypotThreshold,
+		SuppressHoneypotResults:        options.SuppressHoneypotResults,
 		Stream:                         options.Stream,
 		NoMeta:                         options.NoMeta,
 		Timestamp:                      options.Timestamp,

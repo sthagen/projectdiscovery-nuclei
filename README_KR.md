@@ -261,6 +261,11 @@ UPDATE:
    -ud, -update-template-dir string  nuclei-templates를 설치/업데이트할 사용자 지정 디렉토리
    -duc, -disable-update-check       자동 nuclei/templates 업데이트 확인 비활성화
 
+HONEYPOT:
+   -hpd, -honeypot-detect            detect potential honeypot hosts based on match concentration
+   -hpt, -honeypot-threshold int     number of distinct template IDs required to flag a honeypot host (default 15)
+   -shp, -suppress-honeypot          suppress output for flagged honeypot hosts
+
 STATISTICS:
    -stats                    실행 중인 스캔에 대한 통계 표시
    -sj, -stats-json          JSONL(ines) 형식으로 통계 표시
