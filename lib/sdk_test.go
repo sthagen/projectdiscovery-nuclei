@@ -94,7 +94,7 @@ http:
 
 	defer func() {
 		ne.Close()
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	}()
 
 	err = ne.GlobalLoadAllTemplates()
