@@ -124,14 +124,9 @@ func (a *Analyzer) Analyze(options *analyzers.Options) (bool, string, error) {
 			return 0, errors.Wrap(err, "could not rebuild request")
 		}
 
-		// The component base request is parsed from the rule's BaseRequest
-		// before any post-parse header injection (custom -H flags, auth
-		// provider headers, etc.) is applied.  Copy the full header set from
-		// the original fuzz-generated request so that every follow-up
-		// time-delay request carries the same headers — including cookies and
-		// auth tokens — as the request that triggered the initial delay.
+		// copy headers from the original request since Rebuild() only
+		// carries headers present at parse time, not post-parse injections
 		for k, vs := range gr.Request.Header {
-			// Skip the header being fuzzed to avoid overwriting the time-delay payload
 			if gr.Component.Name() == "header" && k == gr.Key {
 				continue
 			}
