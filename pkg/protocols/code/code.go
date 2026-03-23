@@ -277,6 +277,9 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 			Stderr: buff,
 		}
 	}
+	if err != nil {
+		gologger.Warning().Msgf("[%s] Could not execute code: %s", request.options.TemplateID, err)
+	}
 	gologger.Verbose().Msgf("[%s] Executed code on local machine %v", request.options.TemplateID, input.MetaInput.Input)
 
 	if vardump.EnableVarDump {
@@ -352,6 +355,9 @@ func (request *Request) ExecuteWithResults(input *contextargs.Context, dynamicVa
 		if request.options.Options.Debug || request.options.Options.DebugResponse {
 			gologger.Debug().Msg(msg)
 			gologger.Print().Msgf("%s\n\n", responsehighlighter.Highlight(event.OperatorsResult, dataOutputString, request.options.Options.NoColor, false))
+			if gOutput.Stderr.Len() > 0 {
+				gologger.Debug().Msgf("[%s] Code Stderr:\n%s", request.options.TemplateID, gOutput.Stderr.String())
+			}
 		}
 		if request.options.Options.StoreResponse {
 			request.options.Output.WriteStoreDebugData(input.MetaInput.Input, request.options.TemplateID, request.Type().String(), fmt.Sprintf("%s\n%s", msg, dataOutputString))
