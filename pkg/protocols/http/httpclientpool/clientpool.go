@@ -385,13 +385,14 @@ func makeCheckRedirectFunc(redirectType RedirectFlow, maxRedirects int) checkRed
 		case DontFollowRedirect:
 			return http.ErrUseLastResponse
 		case FollowSameHostRedirect:
-			var newHost = req.URL.Host
-			var oldHost = via[0].Host
-			if oldHost == "" {
-				oldHost = via[0].URL.Host
+			var newHost = normalizeHost(req.URL)
+			var oldHost string
+			if via[0].Host != "" {
+				oldHost = normalizeHost(&url.URL{Scheme: via[0].URL.Scheme, Host: via[0].Host})
+			} else {
+				oldHost = normalizeHost(via[0].URL)
 			}
 			if newHost != oldHost {
-				// Tell the http client to not follow redirect
 				return http.ErrUseLastResponse
 			}
 			return checkMaxRedirects(req, via, maxRedirects)
@@ -400,6 +401,22 @@ func makeCheckRedirectFunc(redirectType RedirectFlow, maxRedirects int) checkRed
 		}
 		return nil
 	}
+}
+
+// normalizeHost strips default ports (80 for http, 443 for https) from
+// the URL host so that "example.com:80" and "example.com" compare equal.
+func normalizeHost(u *url.URL) string {
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return u.Host
+	}
+	if (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
+		if strings.Contains(host, ":") {
+			return "[" + host + "]"
+		}
+		return host
+	}
+	return u.Host
 }
 
 func checkMaxRedirects(req *http.Request, via []*http.Request, maxRedirects int) error {

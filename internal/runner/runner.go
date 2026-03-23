@@ -54,6 +54,7 @@ import (
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/hosterrorscache"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/interactsh"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/protocolinit"
+	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/honeypotdetector"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/uncover"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/common/utils/excludematchers"
 	"github.com/projectdiscovery/nuclei/v3/pkg/protocols/headless/engine"
@@ -96,6 +97,8 @@ type Runner struct {
 	fuzzFrequencyCache *frequency.Tracker
 	httpStats          *outputstats.Tracker
 	Logger             *gologger.Logger
+
+	honeypotDetector *honeypotdetector.Detector
 
 	//general purpose temporary directory
 	tmpDir          string
@@ -261,6 +264,12 @@ func New(options *types.Options) (*Runner, error) {
 		}
 	}()
 
+	// Initialize honeypot detector (opt-in) so results can be suppressed.
+	var hpDetector *honeypotdetector.Detector
+	if options.HoneypotDetection {
+		hpDetector = honeypotdetector.New(options.HoneypotThreshold)
+	}
+
 	// create the input provider and load the inputs
 	inputProvider, err := provider.NewInputProvider(provider.InputOptions{Options: options, TempDir: runner.tmpDir})
 	if err != nil {
@@ -272,6 +281,10 @@ func New(options *types.Options) (*Runner, error) {
 	outputWriter, err := output.NewStandardWriter(options)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create output file")
+	}
+	if hpDetector != nil {
+		outputWriter.SetHoneypotDetector(hpDetector)
+		runner.honeypotDetector = hpDetector
 	}
 	// setup a proxy writer to automatically upload results to PDCP
 	runner.output = runner.setupPDCPUpload(outputWriter)
@@ -420,6 +433,10 @@ func (r *Runner) Close() {
 	}
 	if r.output != nil {
 		r.output.Close()
+	}
+
+	if r.honeypotDetector != nil {
+		r.Logger.Print().Msgf("%s\n", r.honeypotDetector.Summary())
 	}
 	if r.issuesClient != nil {
 		r.issuesClient.Close()
@@ -636,16 +653,20 @@ func (r *Runner) RunEnumeration() error {
 	// This uses a separate parser to reduce time taken as
 	// normally nuclei does a lot of compilation and stuff
 	// for templates, which we don't want for these simp
-	if r.options.TemplateList || r.options.TemplateDisplay || r.options.TagList {
+	if r.options.TagList {
+		tagsMap, err := store.LoadTemplateTags()
+		if err != nil {
+			return err
+		}
+		r.listAvailableTags(tagsMap)
+		os.Exit(0)
+	}
+
+	if r.options.TemplateList || r.options.TemplateDisplay {
 		if err := store.LoadTemplatesOnlyMetadata(); err != nil {
 			return err
 		}
-
-		if r.options.TagList {
-			r.listAvailableStoreTags(store)
-		} else {
-			r.listAvailableStoreTemplates(store)
-		}
+		r.listAvailableStoreTemplates(store)
 		os.Exit(0)
 	}
 
@@ -660,7 +681,9 @@ func (r *Runner) RunEnumeration() error {
 		}
 		return nil // exit
 	}
-	store.Load()
+	if err := store.Load(); err != nil {
+		return err
+	}
 	// TODO: remove below functions after v3 or update warning messages
 	templates.PrintDeprecatedProtocolNameMsgIfApplicable(r.options.Silent, r.options.Verbose)
 
@@ -681,8 +704,8 @@ func (r *Runner) RunEnumeration() error {
 	// display execution info like version , templates used etc
 	r.displayExecutionInfo(store)
 
-	// prefetch secrets if enabled
-	if executorOpts.AuthProvider != nil && r.options.PreFetchSecrets {
+	// prefetch secrets to ensure authentication completes before scanning starts
+	if executorOpts.AuthProvider != nil {
 		r.Logger.Info().Msgf("Pre-fetching secrets from authprovider[s]")
 		if err := executorOpts.AuthProvider.PreFetchSecrets(); err != nil {
 			return errors.Wrap(err, "could not pre-fetch secrets")
@@ -854,7 +877,7 @@ func (r *Runner) displayExecutionInfo(store *loader.Store) {
 		// only print these stats in verbose mode
 		stats.ForceDisplayWarning(templates.ExcludedHeadlessTmplStats)
 		stats.ForceDisplayWarning(templates.ExcludedCodeTmplStats)
-		stats.ForceDisplayWarning(templates.ExludedDastTmplStats)
+		stats.ForceDisplayWarning(templates.ExcludedDastTmplStats)
 		stats.ForceDisplayWarning(templates.TemplatesExcludedStats)
 		stats.ForceDisplayWarning(templates.ExcludedFileStats)
 		stats.ForceDisplayWarning(templates.ExcludedSelfContainedStats)
