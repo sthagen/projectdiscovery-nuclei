@@ -28,11 +28,6 @@ import (
 	urlutil "github.com/projectdiscovery/utils/url"
 )
 
-// Init initializes the clientpool implementation
-func Init(options *types.Options) error {
-	return nil
-}
-
 // ConnectionConfiguration contains the custom configuration options for a connection
 type ConnectionConfiguration struct {
 	// DisableKeepAlive of the connection
