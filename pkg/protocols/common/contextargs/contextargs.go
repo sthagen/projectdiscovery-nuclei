@@ -2,7 +2,9 @@ package contextargs
 
 import (
 	"context"
+	"net"
 	"net/http/cookiejar"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -112,8 +114,8 @@ func (ctx *Context) Add(key string, v interface{}) {
 func (ctx *Context) UseNetworkPort(port string, excludePorts string) error {
 	ignorePorts := reservedPorts
 	if excludePorts != "" {
-		// TODO: add support for service names like http,https,ssh etc once https://github.com/projectdiscovery/netdb is ready
-		ignorePorts = sliceutil.Dedupe(strings.Split(excludePorts, ","))
+		ignorePorts = resolvePortList(strings.Split(excludePorts, ","))
+		ignorePorts = sliceutil.Dedupe(ignorePorts)
 	}
 	if port == "" {
 		// if template does not contain port, do nothing
@@ -182,6 +184,25 @@ func (ctx *Context) Clone() *Context {
 		CookieJar: ctx.CookieJar,
 	}
 	return newCtx
+}
+
+// resolvePortList converts a list of port strings (numeric or service names) to numeric port strings.
+func resolvePortList(ports []string) []string {
+	resolved := make([]string, 0, len(ports))
+	for _, p := range ports {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, err := strconv.Atoi(p); err == nil {
+			resolved = append(resolved, p)
+			continue
+		}
+		if portInt, err := net.LookupPort("tcp", p); err == nil {
+			resolved = append(resolved, strconv.Itoa(portInt))
+		}
+	}
+	return resolved
 }
 
 // GetCopyIfHostOutdated returns a new contextargs if the host is outdated
