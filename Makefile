@@ -7,17 +7,19 @@ GOBUILD_ADDITIONAL_ARGS :=
 GOMOD := $(GOCMD) mod
 GOTEST := $(GOCMD) test
 GOFLAGS := -v
+GOFUZZ_PACKAGE ?=
+FUZZ_DURATION ?= 15m
 # This should be disabled if the binary uses pprof
 LDFLAGS := -s -w
 
 ifneq ($(shell go env GOOS),darwin)
 	LDFLAGS += -extldflags "-static"
 endif
-    
-.PHONY: all build build-stats clean devtools-all devtools-bindgen devtools-scrapefuncs
-.PHONY: devtools-tsgen docs docgen dsl-docs functional fuzzplayground go-build lint lint-strict syntax-docs
+
+.PHONY: all build build-stats clean devtools-all devtools-bindgen devtools-scrapefuncs fuzz fuzz-ci fuzz-tools
+.PHONY: devtools-tsgen docs docgen dsl-docs functional go-build lint lint-strict fuzzplayground syntax-docs
 .PHONY: integration jsupdate-all jsupdate-bindgen jsupdate-tsgen memogen scan-charts test test-with-lint
-.PHONY: tidy ts verify download vet template-validate
+.PHONY: tidy ts verify download vet template-validate build-fuzz discover-fuzz-packages
 
 all: build
 
@@ -131,6 +133,121 @@ fuzzplayground: GOBUILD_OUTPUT = ./bin/fuzzplayground
 fuzzplayground: GOBUILD_PACKAGES = cmd/tools/fuzzplayground/main.go
 fuzzplayground: LDFLAGS = -s -w
 fuzzplayground: go-build
+
+fuzz-tools:
+	@$(GOCMD) tool -modfile=go.tool.mod -n go-fuzz-build >/dev/null
+	@$(GOCMD) tool -modfile=go.tool.mod -n go-fuzz >/dev/null
+
+discover-fuzz-packages:
+	@set -eu; \
+	entries_file="$$(mktemp)"; \
+	trap 'rm -f "$$entries_file"' EXIT HUP INT TERM; \
+	find . -type d -path '*/testdata/gofuzz-corpus' | LC_ALL=C sort | while IFS= read -r corpus_dir; do \
+		pkg_dir="$${corpus_dir%/testdata/gofuzz-corpus}"; \
+		if [ ! -f "$$pkg_dir/fuzz.go" ]; then \
+			continue; \
+		fi; \
+		pkg_dir="$${pkg_dir#./}"; \
+		pkg="./$$pkg_dir"; \
+		if ! $(GOCMD) list "$$pkg" >/dev/null 2>&1; then \
+			echo "failed to resolve $$pkg"; \
+			exit 1; \
+		fi; \
+		jq -cn --arg pkg "$$pkg" '{pkg: $$pkg}' >> "$$entries_file"; \
+	done; \
+	if [ ! -s "$$entries_file" ]; then \
+		echo "no fuzzable packages discovered"; \
+		exit 1; \
+	fi; \
+	matrix="$$(jq -cs '{include: .}' "$$entries_file")"; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then \
+		printf 'matrix=%s\n' "$$matrix" >> "$${GITHUB_OUTPUT}"; \
+	else \
+		printf '%s\n' "$$matrix"; \
+	fi
+
+build-fuzz: fuzz-tools
+	@if [ -z "$(GOFUZZ_PACKAGE)" ]; then echo "GOFUZZ_PACKAGE is required"; exit 1; fi
+	@PACKAGE_DIR="$$( $(GOCMD) list -f '{{.Dir}}' $(GOFUZZ_PACKAGE) 2>/dev/null )" || { \
+		echo "failed to resolve GOFUZZ_PACKAGE: $(GOFUZZ_PACKAGE)"; \
+		exit 1; \
+	}; \
+	WORKDIR="$$PACKAGE_DIR/.gofuzz"; \
+	CORPUS_DIR="$$PACKAGE_DIR/testdata/gofuzz-corpus"; \
+	BIN_PATH="$$WORKDIR/$$(basename "$$PACKAGE_DIR")-fuzz.zip"; \
+	if [ ! -d "$$CORPUS_DIR" ]; then \
+		echo "seed corpus directory does not exist: $$CORPUS_DIR"; \
+		exit 1; \
+	fi; \
+	set -- "$$CORPUS_DIR"/*; \
+	if [ "$$1" = "$$CORPUS_DIR/*" ]; then \
+		echo "seed corpus directory has no seed files: $$CORPUS_DIR"; \
+		exit 1; \
+	fi; \
+	mkdir -p "$$WORKDIR/corpus"; \
+	cp -f "$$CORPUS_DIR"/* "$$WORKDIR/corpus/"; \
+	GO111MODULE=on $(GOCMD) tool -modfile=go.tool.mod go-fuzz-build -o "$$BIN_PATH" $(GOFUZZ_PACKAGE)
+
+fuzz: build-fuzz
+	@PACKAGE_DIR="$$( $(GOCMD) list -f '{{.Dir}}' $(GOFUZZ_PACKAGE) 2>/dev/null )" || { \
+		echo "failed to resolve GOFUZZ_PACKAGE: $(GOFUZZ_PACKAGE)"; \
+		exit 1; \
+	}; \
+	WORKDIR="$$PACKAGE_DIR/.gofuzz"; \
+	BIN_PATH="$$WORKDIR/$$(basename "$$PACKAGE_DIR")-fuzz.zip"; \
+	$(GOCMD) tool -modfile=go.tool.mod go-fuzz -bin="$$BIN_PATH" -workdir="$$WORKDIR"
+
+fuzz-ci:
+	@if [ "$${CI:-}" != "true" ]; then echo "fuzz-ci should be run in CI; use 'make fuzz' locally"; exit 1; fi
+	@if [ -z "$(GOFUZZ_PACKAGE)" ]; then echo "GOFUZZ_PACKAGE is required"; exit 1; fi
+	@set -eu; \
+	pkg_dir="$(GOFUZZ_PACKAGE)"; \
+	pkg_dir="$${pkg_dir#./}"; \
+	workdir="$$pkg_dir/.gofuzz"; \
+	pkg_id="$$(printf '%s' "$$pkg_dir" | tr '/.' '-')"; \
+	artifact_name="gofuzz-$$pkg_id"; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then \
+		printf 'artifact_name=%s\n' "$$artifact_name" >> "$${GITHUB_OUTPUT}"; \
+	fi; \
+	mkdir -p "$$workdir"; \
+	timeout_bin="$$(command -v timeout || command -v gtimeout || true)"; \
+	if [ -z "$$timeout_bin" ]; then \
+		echo "timeout command not found"; \
+		exit 1; \
+	fi; \
+	exit_code=0; \
+	"$$timeout_bin" "$(FUZZ_DURATION)" $(MAKE) --no-print-directory fuzz GOFUZZ_PACKAGE="$(GOFUZZ_PACKAGE)" || exit_code=$$?; \
+	if [ "$$exit_code" -ne 0 ] && [ "$$exit_code" -ne 124 ]; then \
+		echo "fuzzing failed with exit code $$exit_code"; \
+		exit "$$exit_code"; \
+	fi; \
+	count_files() { \
+		dir="$$1"; \
+		if [ ! -d "$$dir" ]; then \
+			echo 0; \
+			return; \
+		fi; \
+		if [ "$$(basename "$$dir")" = "crashers" ]; then \
+			find "$$dir" -maxdepth 1 -type f -printf '%f\n' | sed -E 's/\.(output|quoted)$$//' | sort -u | wc -l | tr -d '[:space:]'; \
+			return; \
+		fi; \
+		find "$$dir" -maxdepth 1 -type f | wc -l | tr -d '[:space:]'; \
+	}; \
+	crasher_count="$$(count_files "$$workdir/crashers")"; \
+	corpus_count="$$(count_files "$$workdir/corpus")"; \
+	suppressions_count="$$(count_files "$$workdir/suppressions")"; \
+	if [ -n "$${GITHUB_STEP_SUMMARY:-}" ]; then \
+		{ \
+			echo "## \`$(GOFUZZ_PACKAGE)\`"; \
+			echo; \
+			echo "- Corpus: $$corpus_count"; \
+			echo "- Crashers: $$crasher_count"; \
+			echo "- Suppressions: $$suppressions_count"; \
+			echo; \
+		} >> "$${GITHUB_STEP_SUMMARY}"; \
+	else \
+		printf 'Package: %s\nCorpus: %s\nCrashers: %s\nSuppressions: %s\n' "$(GOFUZZ_PACKAGE)" "$$corpus_count" "$$crasher_count" "$$suppressions_count"; \
+	fi
 
 memogen: GOBUILD_OUTPUT = ./bin/memogen
 memogen: GOBUILD_PACKAGES = cmd/memogen/memogen.go

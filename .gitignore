@@ -2,6 +2,7 @@
 **/*-cache
 **/*-config
 **/.cache
+**/.gofuzz/
 **/*.DS_Store
 **/*.exe
 .devcontainer
