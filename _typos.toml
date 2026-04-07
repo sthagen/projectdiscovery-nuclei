@@ -31,6 +31,8 @@ AllowdTypes = "AllowdTypes"
 ExludedDastTmplStats = "ExludedDastTmplStats"
 
 [default.extend-words]
+# External package API (fileutil.IsWriteable)
+Writeable = "Writeable" # TODO(dwisiswant0): Fix in upstream.
 # Variable name used for flow annotations
 fo = "fo"
 # Serbian test data in XML
