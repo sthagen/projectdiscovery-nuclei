@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Mzack9999/goja"
 	"github.com/Mzack9999/goja_nodejs/console"
@@ -47,9 +48,7 @@ const (
 )
 
 var (
-	r                *require.Registry
 	lazyRegistryInit = sync.OnceFunc(func() {
-		r = new(require.Registry) // this can be shared by multiple runtimes
 		// autoregister console node module with default printer it uses gologger backend
 		require.RegisterNativeModule(console.ModuleName, console.RequireWithPrinter(goconsole.NewGoConsolePrinter()))
 	})
@@ -85,6 +84,7 @@ func executeWithRuntime(runtime *goja.Runtime, p *goja.Program, args *ExecuteArg
 			opts.Cleanup(runtime)
 		}
 		runtime.RemoveContextValue("executionId")
+		runtime.RemoveContextValue("ctx")
 	}()
 
 	// TODO(dwisiswant0): remove this once we get the RCA.
@@ -104,15 +104,17 @@ func executeWithRuntime(runtime *goja.Runtime, p *goja.Program, args *ExecuteArg
 	for k, v := range args.Args {
 		_ = runtime.Set(k, v)
 	}
+
+	runtime.SetContextValue("executionId", opts.ExecutionId)
+	runtime.SetContextValue("ctx", opts.Context)
+	enableRequire(runtime)
+
 	// register extra callbacks if any
 	if opts != nil && opts.Callback != nil {
 		if err := opts.Callback(runtime); err != nil {
 			return nil, err
 		}
 	}
-
-	// inject execution id and context
-	runtime.SetContextValue("executionId", opts.ExecutionId)
 
 	// execute the script
 	return runtime.RunProgram(p)
@@ -139,8 +141,34 @@ func executeWithPoolingProgram(p *goja.Program, args *ExecuteArgs, opts *Execute
 	lazySgInit()
 	sgResizeCheck(opts.Context)
 
-	pooljsc.Add()
-	defer pooljsc.Done()
+	// Acquire a pool slot, respecting the execution deadline. Returns
+	// immediately if the context has already expired.
+	if err := pooljsc.AddWithContext(opts.Context); err != nil {
+		return nil, err
+	}
+	// Watchdog: release the pool slot if the deadline expires while the
+	// goroutine is still running (zombie). ExecFuncWithTwoReturns abandons
+	// the caller on timeout, but the goroutine keeps running and holds its
+	// slot via defer. The watchdog ensures the slot is freed at the deadline
+	// so the pool doesn't starve. The atomic.Bool guarantees exactly one
+	// Done() call between the watchdog and the normal defer path.
+	var slotReleased atomic.Bool
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-opts.Context.Done():
+			if slotReleased.CompareAndSwap(false, true) {
+				pooljsc.Done()
+			}
+		case <-done:
+		}
+	}()
+	defer func() {
+		close(done)
+		if slotReleased.CompareAndSwap(false, true) {
+			pooljsc.Done()
+		}
+	}()
 	runtime := gojapool.Get().(*goja.Runtime)
 	defer gojapool.Put(runtime)
 	var buff bytes.Buffer
@@ -203,14 +231,32 @@ func InternalGetGeneratorRuntime() *goja.Runtime {
 	return runtime
 }
 
-func getRegistry() *require.Registry {
+func enableRequire(runtime *goja.Runtime) {
 	lazyRegistryInit()
-	return r
+	_ = require.NewRegistry(require.WithLoader(newSourceLoader(runtime))).Enable(runtime)
+}
+
+func newSourceLoader(runtime *goja.Runtime) require.SourceLoader {
+	return func(path string) ([]byte, error) {
+		executionID := ""
+		if value, ok := runtime.GetContextValue("executionId"); ok {
+			if id, ok := value.(string); ok {
+				executionID = id
+			}
+		}
+
+		normalizedPath, err := protocolstate.NormalizePathWithExecutionId(executionID, path)
+		if err != nil {
+			return nil, err
+		}
+
+		return require.DefaultSourceLoader(normalizedPath)
+	}
 }
 
 func createNewRuntime() *goja.Runtime {
 	runtime := protocolstate.NewJSRuntime()
-	_ = getRegistry().Enable(runtime)
+	enableRequire(runtime)
 	// by default import below modules every time
 	_ = runtime.Set("console", require.Require(runtime, console.ModuleName))
 
