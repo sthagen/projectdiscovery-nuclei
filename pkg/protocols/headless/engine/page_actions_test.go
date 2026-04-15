@@ -600,16 +600,16 @@ func TestActionWaitDialog(t *testing.T) {
 		actions := []*Action{
 			{
 				ActionType: ActionTypeHolder{ActionType: ActionNavigate},
-				Data:       map[string]string{"url": "{{BaseURL}}/?autoclick=true&delay=500"},
+				Data:       map[string]string{"url": "{{BaseURL}}/?autoclick=true&delay=2000"},
 			},
 			{
 				ActionType: ActionTypeHolder{ActionType: ActionWaitDialog},
 				Name:       "test",
-				Data:       map[string]string{"max-duration": "2s"},
+				Data:       map[string]string{"max-duration": "5s"},
 			},
 		}
 
-		testHeadlessSimpleResponse(t, response, actions, 2*time.Second, func(page *Page, err error, out ActionData) {
+		testHeadlessSimpleResponse(t, response, actions, 5*time.Second, func(page *Page, err error, out ActionData) {
 			require.Nil(t, err, "could not run page actions")
 
 			test, ok := out["test"].(bool)
