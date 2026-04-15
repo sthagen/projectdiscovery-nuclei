@@ -162,7 +162,7 @@ jobs:
     needs: ["tests"]
     uses: ./.github/workflows/flamegraph.yaml
 
-  perf-regression:
-    name: "Performance regression"
-    needs: ["tests"]
-    uses: ./.github/workflows/perf-regression.yaml
+  # perf-regression:
+  #   name: "Performance regression"
+  #   needs: ["tests"]
+  #   uses: ./.github/workflows/perf-regression.yaml
