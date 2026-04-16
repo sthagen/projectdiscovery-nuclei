@@ -291,6 +291,11 @@ UNCOVER引擎:
     -ud, -update-template-dir string     指定模板目录
     -duc, -disable-update-check          禁用nuclei程序与模板更新
 
+HONEYPOT:
+    -hpd, -honeypot-detect            detect potential honeypot hosts based on match concentration
+    -hpt, -honeypot-threshold int     number of distinct template IDs required to flag a honeypot host (default 15)
+    -shp, -suppress-honeypot          suppress output for flagged honeypot hosts
+
 统计：
     -stats                               显示正在扫描的统计信息
     -sj, -stats-json                     将统计信息以JSONL格式输出到文件
@@ -320,7 +325,7 @@ UNCOVER引擎:
 
 ```
 
-更多信息请参考文档: https://docs.nuclei.sh/getting-started/running
+更多信息请参考文档: https://docs.projectdiscovery.io/getting-started/running
 
 
 ### 运行Nuclei

@@ -261,6 +261,11 @@ UPDATE:
    -ud, -update-template-dir string  nuclei-templates를 설치/업데이트할 사용자 지정 디렉토리
    -duc, -disable-update-check       자동 nuclei/templates 업데이트 확인 비활성화
 
+HONEYPOT:
+   -hpd, -honeypot-detect            detect potential honeypot hosts based on match concentration
+   -hpt, -honeypot-threshold int     number of distinct template IDs required to flag a honeypot host (default 15)
+   -shp, -suppress-honeypot          suppress output for flagged honeypot hosts
+
 STATISTICS:
    -stats                    실행 중인 스캔에 대한 통계 표시
    -sj, -stats-json          JSONL(ines) 형식으로 통계 표시
@@ -289,7 +294,7 @@ JSON 출력으로 nuclei 실행:
 정렬된 Markdown 출력으로 nuclei 실행 (환경 변수 사용):
 	$ MARKDOWN_EXPORT_SORT_MODE=template nuclei -target example.com -markdown-export nuclei_report/
 
-추가 문서는 여기에서 확인할 수 있습니다: https://docs.nuclei.sh/getting-started/running
+추가 문서는 여기에서 확인할 수 있습니다: https://docs.projectdiscovery.io/getting-started/running
 ```
 
 ### Nuclei 실행

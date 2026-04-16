@@ -296,6 +296,11 @@ UPDATE:
    -ud, -update-template-dir string  directorio personalizado para instalar/actualizar nuclei-templates
    -duc, -disable-update-check       deshabilita la comprobación automática de actualizaciones de nuclei/templates
 
+HONEYPOT:
+   -hpd, -honeypot-detect            detect potential honeypot hosts based on match concentration
+   -hpt, -honeypot-threshold int     number of distinct template IDs required to flag a honeypot host (default 15)
+   -shp, -suppress-honeypot          suppress output for flagged honeypot hosts
+
 STATISTICS:
    -stats                    muestra estadísticas sobre el escaneo en ejecución
    -sj, -stats-json          muestra estadísticas en formato JSONL(ines)
@@ -328,7 +333,7 @@ Ejecutar nuclei con una salida JSON:
 Ejecutar nuclei con salidas Markdown ordenadas (con variables de entorno):
    $ MARKDOWN_EXPORT_SORT_MODE=template nuclei -target example.com -markdown-export nuclei_report/
 
-Documentación adicional disponible en: https://docs.nuclei.sh/getting-started/running
+Documentación adicional disponible en: https://docs.projectdiscovery.io/getting-started/running
 ```
 
 ### Ejecutando Nuclei
